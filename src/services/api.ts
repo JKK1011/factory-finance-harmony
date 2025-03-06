@@ -1,15 +1,20 @@
 
 import { query } from '@/utils/dbConnection';
 
-// Define interfaces for our data types
+// Define our types
+export interface User {
+  id: string | number;
+  name: string;
+  email: string;
+}
+
 export interface Contact {
   id: string | number;
   name: string;
-  type: 'customer' | 'supplier' | 'borrower';
+  type: string;
   email: string;
   phone: string;
-  contact_person: string;
-  contactPerson?: string; // For frontend use
+  contactPerson: string;
   balance: number;
   created_at?: string;
   updated_at?: string;
@@ -17,205 +22,275 @@ export interface Contact {
 
 export interface Transaction {
   id: string | number;
-  type: 'sale' | 'purchase' | 'payment' | 'receipt' | 'expense';
+  type: string;
   amount: number;
   date: string;
-  contact_id: string | number;
-  contactId?: string | number; // For frontend use
+  contactId: string | number;
   reference: string;
-  payment_method: string;
-  paymentMethod?: string; // For frontend use
+  paymentMethod: string;
   description: string;
   created_at?: string;
   updated_at?: string;
 }
 
-export interface User {
-  id: string | number;
-  name: string;
-  email: string;
-  password: string;
-  created_at?: string;
-  updated_at?: string;
+export interface FinancialOverview {
+  cashBalance: number;
+  cashChange: number;
+  receivables: number;
+  receivablesChange: number;
+  contactsCount: number;
+  contactsChange: number;
+  transactionsCount: number;
+  transactionsChange: number;
 }
 
-// Contact related API calls
+// Auth API
+export const authApi = {
+  login: async (email: string, password: string): Promise<User> => {
+    try {
+      const { rows } = await query<any>(
+        'SELECT * FROM users WHERE email = ? AND password = ? LIMIT 1',
+        [email, password]
+      );
+
+      if (rows.length === 0) {
+        throw new Error('Invalid email or password');
+      }
+
+      const user = rows[0];
+      return { 
+        id: user.id, 
+        email: user.email, 
+        name: user.name 
+      };
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
+  }
+};
+
+// Contacts API
 export const contactsApi = {
-  // Get all contacts
   getContacts: async (): Promise<Contact[]> => {
-    const result = await query<Contact>('SELECT * FROM contacts ORDER BY name');
-    return result.rows.map(contact => ({
-      ...contact,
-      contactPerson: contact.contact_person // Map snake_case to camelCase for frontend
-    }));
+    try {
+      const { rows } = await query<any>('SELECT * FROM contacts ORDER BY name ASC');
+      return rows;
+    } catch (error) {
+      console.error('Error fetching contacts:', error);
+      throw error;
+    }
   },
-  
-  // Get contact by ID
-  getContactById: async (id: string): Promise<Contact> => {
-    const result = await query<Contact>('SELECT * FROM contacts WHERE id = ?', [id]);
-    const contact = result.rows[0];
-    return {
-      ...contact,
-      contactPerson: contact.contact_person
-    };
+
+  createContact: async (contact: any): Promise<Contact> => {
+    try {
+      const { rows } = await query<any>(
+        'INSERT INTO contacts (name, type, email, phone, contact_person, balance) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
+        [contact.name, contact.type, contact.email, contact.phone, contact.contactPerson, 0]
+      );
+      
+      return { 
+        id: rows[0].id,
+        name: contact.name,
+        type: contact.type,
+        email: contact.email,
+        phone: contact.phone,
+        contactPerson: contact.contactPerson,
+        balance: 0
+      };
+    } catch (error) {
+      console.error('Error creating contact:', error);
+      throw error;
+    }
   },
-  
-  // Create new contact
-  createContact: async (contact: Partial<Contact>): Promise<Contact> => {
-    const { name, type, email, phone, contactPerson, balance = 0 } = contact;
-    const result = await query<Contact>(
-      'INSERT INTO contacts (name, type, email, phone, contact_person, balance) VALUES (?, ?, ?, ?, ?, ?) RETURNING *',
-      [name, type, email, phone, contactPerson, balance]
-    );
-    const newContact = result.rows[0];
-    return {
-      ...newContact,
-      contactPerson: newContact.contact_person
-    };
-  },
-  
-  // Update contact
-  updateContact: async (id: string, contact: Partial<Contact>): Promise<Contact> => {
-    const { name, type, email, phone, contactPerson, balance } = contact;
-    const result = await query<Contact>(
-      'UPDATE contacts SET name = ?, type = ?, email = ?, phone = ?, contact_person = ?, balance = ? WHERE id = ? RETURNING *',
-      [name, type, email, phone, contactPerson, balance, id]
-    );
-    const updatedContact = result.rows[0];
-    return {
-      ...updatedContact,
-      contactPerson: updatedContact.contact_person
-    };
-  },
-  
-  // Delete contact
-  deleteContact: async (id: string): Promise<{ success: boolean }> => {
-    await query('DELETE FROM contacts WHERE id = ?', [id]);
-    return { success: true };
+
+  deleteContact: async (id: string): Promise<void> => {
+    try {
+      await query('DELETE FROM contacts WHERE id = ?', [id]);
+    } catch (error) {
+      console.error('Error deleting contact:', error);
+      throw error;
+    }
   }
 };
 
-// Transaction related API calls
+// Transactions API
 export const transactionsApi = {
-  // Get all transactions
-  getTransactions: async (): Promise<Transaction[]> => {
-    const result = await query<Transaction>('SELECT * FROM transactions ORDER BY date DESC');
-    return result.rows.map(transaction => ({
-      ...transaction,
-      contactId: transaction.contact_id,
-      paymentMethod: transaction.payment_method
-    }));
+  getTransactions: async (): Promise<any[]> => {
+    try {
+      const { rows } = await query<any>(
+        `SELECT t.*, c.name as contactName 
+         FROM transactions t
+         LEFT JOIN contacts c ON t.contact_id = c.id
+         ORDER BY t.date DESC, t.id DESC`
+      );
+      return rows;
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      throw error;
+    }
   },
-  
-  // Get transaction by ID
-  getTransactionById: async (id: string): Promise<Transaction> => {
-    const result = await query<Transaction>('SELECT * FROM transactions WHERE id = ?', [id]);
-    const transaction = result.rows[0];
-    return {
-      ...transaction,
-      contactId: transaction.contact_id,
-      paymentMethod: transaction.payment_method
-    };
+
+  getRecentTransactions: async (): Promise<any[]> => {
+    try {
+      const { rows } = await query<any>(
+        `SELECT t.*, c.name as contactName 
+         FROM transactions t
+         LEFT JOIN contacts c ON t.contact_id = c.id
+         ORDER BY t.date DESC, t.id DESC
+         LIMIT 5`
+      );
+      return rows;
+    } catch (error) {
+      console.error('Error fetching recent transactions:', error);
+      throw error;
+    }
   },
-  
-  // Create new transaction
-  createTransaction: async (transaction: Partial<Transaction>): Promise<Transaction> => {
-    const { type, amount, date, contactId, reference, paymentMethod, description } = transaction;
-    const result = await query<Transaction>(
-      'INSERT INTO transactions (type, amount, date, contact_id, reference, payment_method, description) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *',
-      [type, amount, date, contactId, reference, paymentMethod, description]
-    );
-    const newTransaction = result.rows[0];
-    return {
-      ...newTransaction,
-      contactId: newTransaction.contact_id,
-      paymentMethod: newTransaction.payment_method
-    };
+
+  createTransaction: async (transaction: any): Promise<any> => {
+    try {
+      // Update contact balance based on transaction type
+      await updateContactBalance(transaction);
+
+      // Insert transaction
+      const { rows } = await query<any>(
+        `INSERT INTO transactions 
+         (type, amount, date, contact_id, reference, payment_method, description) 
+         VALUES (?, ?, ?, ?, ?, ?, ?) 
+         RETURNING id`,
+        [
+          transaction.type, 
+          transaction.amount, 
+          transaction.date, 
+          transaction.contactId, 
+          transaction.reference, 
+          transaction.paymentMethod, 
+          transaction.description
+        ]
+      );
+      
+      return { id: rows[0].id, ...transaction };
+    } catch (error) {
+      console.error('Error creating transaction:', error);
+      throw error;
+    }
   },
-  
-  // Update transaction
-  updateTransaction: async (id: string, transaction: Partial<Transaction>): Promise<Transaction> => {
-    const { type, amount, date, contactId, reference, paymentMethod, description } = transaction;
-    const result = await query<Transaction>(
-      'UPDATE transactions SET type = ?, amount = ?, date = ?, contact_id = ?, reference = ?, payment_method = ?, description = ? WHERE id = ? RETURNING *',
-      [type, amount, date, contactId, reference, paymentMethod, description, id]
-    );
-    const updatedTransaction = result.rows[0];
-    return {
-      ...updatedTransaction,
-      contactId: updatedTransaction.contact_id,
-      paymentMethod: updatedTransaction.payment_method
-    };
-  },
-  
-  // Delete transaction
-  deleteTransaction: async (id: string): Promise<{ success: boolean }> => {
-    await query('DELETE FROM transactions WHERE id = ?', [id]);
-    return { success: true };
+
+  deleteTransaction: async (id: string): Promise<void> => {
+    try {
+      // First get the transaction to update contact balance
+      const { rows: transactionRows } = await query<any>(
+        'SELECT * FROM transactions WHERE id = ?',
+        [id]
+      );
+      
+      if (transactionRows.length > 0) {
+        const transaction = transactionRows[0];
+        
+        // Reverse the balance effect
+        await updateContactBalance({
+          ...transaction,
+          amount: transaction.amount,
+          contactId: transaction.contact_id,
+          type: reverseTransactionType(transaction.type)
+        });
+        
+        // Delete the transaction
+        await query('DELETE FROM transactions WHERE id = ?', [id]);
+      }
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      throw error;
+    }
   }
 };
 
-// User related API calls
-export const usersApi = {
-  // Login user
-  loginUser: async (email: string, password: string): Promise<{ id: string | number; email: string; name: string }> => {
-    // In a real app, you would hash the password and use a secure authentication method
-    // This is just a simple example for demonstration
-    const result = await query<User>('SELECT * FROM users WHERE email = ?', [email]);
-    if (result.rows.length === 0) {
-      throw new Error('Invalid credentials');
+// Finance API for dashboard
+export const financeApi = {
+  getFinancialOverview: async (): Promise<FinancialOverview> => {
+    try {
+      // Get total cash balance (sum of all transactions)
+      const { rows: cashRows } = await query<any>(
+        `SELECT SUM(CASE 
+           WHEN type IN ('sale', 'receipt') THEN amount 
+           WHEN type IN ('purchase', 'payment', 'expense') THEN -amount 
+           ELSE 0 
+         END) as total 
+         FROM transactions`
+      );
+      
+      // Get total receivables (sum of customer balances)
+      const { rows: receivablesRows } = await query<any>(
+        `SELECT SUM(balance) as total FROM contacts WHERE type = 'customer' AND balance > 0`
+      );
+      
+      // Get contact count
+      const { rows: contactCountRows } = await query<any>(
+        `SELECT COUNT(*) as count FROM contacts`
+      );
+      
+      // Get transaction count
+      const { rows: transactionCountRows } = await query<any>(
+        `SELECT COUNT(*) as count FROM transactions`
+      );
+      
+      return {
+        cashBalance: cashRows[0].total || 0,
+        cashChange: 0, // We'll calculate this in a real app
+        receivables: receivablesRows[0].total || 0,
+        receivablesChange: 0, // We'll calculate this in a real app
+        contactsCount: contactCountRows[0].count || 0,
+        contactsChange: 0, // We'll calculate this in a real app
+        transactionsCount: transactionCountRows[0].count || 0,
+        transactionsChange: 0 // We'll calculate this in a real app
+      };
+    } catch (error) {
+      console.error('Error fetching financial overview:', error);
+      throw error;
     }
-    const user = result.rows[0];
-    // Simple password check - in reality, you'd use bcrypt or similar
-    if (user.password !== password) {
-      throw new Error('Invalid credentials');
-    }
-    return { id: user.id, email: user.email, name: user.name };
   }
 };
 
-interface FinancialSummary {
-  total: number;
+// Helper function to update contact balance based on transaction type
+async function updateContactBalance(transaction: any): Promise<void> {
+  if (!transaction.contactId) return;
+  
+  let balanceChange = 0;
+  
+  // Calculate balance change based on transaction type
+  switch (transaction.type) {
+    case 'sale':
+      balanceChange = transaction.amount;
+      break;
+    case 'receipt':
+      balanceChange = -transaction.amount;
+      break;
+    case 'purchase':
+      balanceChange = -transaction.amount;
+      break;
+    case 'payment':
+      balanceChange = transaction.amount;
+      break;
+    case 'expense':
+      // Expenses typically don't affect contact balances
+      return;
+  }
+  
+  // Update contact balance
+  await query(
+    'UPDATE contacts SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [balanceChange, transaction.contactId]
+  );
 }
 
-// Dashboard statistics
-export const statsApi = {
-  // Get financial summary
-  getFinancialSummary: async () => {
-    const salesResult = await query<FinancialSummary>('SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = ?', ['sale']);
-    const expensesResult = await query<FinancialSummary>('SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = ?', ['expense']);
-    const receivablesResult = await query<FinancialSummary>('SELECT COALESCE(SUM(balance), 0) as total FROM contacts WHERE type = ? AND balance > 0', ['customer']);
-    const payablesResult = await query<FinancialSummary>('SELECT COALESCE(SUM(balance), 0) as total FROM contacts WHERE type = ? AND balance < 0', ['supplier']);
-    
-    return {
-      totalSales: salesResult.rows[0].total || 0,
-      totalExpenses: expensesResult.rows[0].total || 0,
-      totalReceivables: receivablesResult.rows[0].total || 0,
-      totalPayables: Math.abs(payablesResult.rows[0].total || 0),
-      netProfit: (salesResult.rows[0].total || 0) - (expensesResult.rows[0].total || 0)
-    };
-  },
-  
-  // Get monthly performance data
-  getMonthlyPerformance: async (year: number) => {
-    interface MonthlyData {
-      month: number;
-      sales: number;
-      expenses: number;
-    }
-    
-    // SQLite doesn't have EXTRACT() function, so we'll use strftime
-    const result = await query<MonthlyData>(`
-      SELECT 
-        CAST(strftime('%m', date) AS INTEGER) as month,
-        SUM(CASE WHEN type = 'sale' THEN amount ELSE 0 END) as sales,
-        SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expenses
-      FROM transactions
-      WHERE strftime('%Y', date) = ?
-      GROUP BY month
-      ORDER BY month
-    `, [year.toString()]);
-    
-    return result.rows;
+// Helper function to get the reverse transaction type for deletion
+function reverseTransactionType(type: string): string {
+  switch (type) {
+    case 'sale': return 'receipt';
+    case 'receipt': return 'sale';
+    case 'purchase': return 'payment';
+    case 'payment': return 'purchase';
+    case 'expense': return 'expense';
+    default: return type;
   }
-};
+}

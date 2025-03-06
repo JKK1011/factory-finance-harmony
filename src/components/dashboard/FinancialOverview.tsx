@@ -8,8 +8,11 @@ import {
   Users, 
   ShoppingCart, 
   Landmark, 
-  DollarSign
+  DollarSign,
+  Loader2
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { financeApi } from "@/services/api";
 
 interface MetricCardProps {
   title: string;
@@ -18,9 +21,10 @@ interface MetricCardProps {
   icon: React.ReactNode;
   prefix?: string;
   suffix?: string;
+  isLoading?: boolean;
 }
 
-function MetricCard({ title, value, change, icon, prefix = "", suffix = "" }: MetricCardProps) {
+function MetricCard({ title, value, change, icon, prefix = "", suffix = "", isLoading = false }: MetricCardProps) {
   const isPositive = change >= 0;
   
   return (
@@ -28,58 +32,76 @@ function MetricCard({ title, value, change, icon, prefix = "", suffix = "" }: Me
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <h3 className="text-2xl font-bold mt-1 tracking-tight">
-            <AnimatedCounter 
-              value={value} 
-              prefix={prefix} 
-              suffix={suffix} 
-              decimals={2} 
-            />
-          </h3>
+          {isLoading ? (
+            <div className="h-8 flex items-center mt-1">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <h3 className="text-2xl font-bold mt-1 tracking-tight">
+              <AnimatedCounter 
+                value={value} 
+                prefix={prefix} 
+                suffix={suffix} 
+                decimals={2} 
+              />
+            </h3>
+          )}
         </div>
         <div className="h-10 w-10 rounded-full flex items-center justify-center bg-primary/10 text-primary">
           {icon}
         </div>
       </div>
-      <div className="mt-4 flex items-center text-sm">
-        <span className={`flex items-center ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-          {isPositive ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
-          {Math.abs(change)}%
-        </span>
-        <span className="text-muted-foreground ml-2">from last month</span>
-      </div>
+      {!isLoading && (
+        <div className="mt-4 flex items-center text-sm">
+          <span className={`flex items-center ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
+            {isPositive ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />}
+            {Math.abs(change)}%
+          </span>
+          <span className="text-muted-foreground ml-2">from last month</span>
+        </div>
+      )}
     </GlassCard>
   );
 }
 
 export function FinancialOverview() {
+  // Fetch financial overview data
+  const { data: financialData, isLoading } = useQuery({
+    queryKey: ['financial-overview'],
+    queryFn: financeApi.getFinancialOverview
+  });
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <MetricCard
         title="Cash Balance"
-        value={42750.65}
-        change={2.5}
+        value={financialData?.cashBalance || 0}
+        change={financialData?.cashChange || 0}
         icon={<DollarSign className="h-5 w-5" />}
         prefix="$"
+        isLoading={isLoading}
       />
       <MetricCard
         title="Receivables"
-        value={18420.00}
-        change={-1.8}
+        value={financialData?.receivables || 0}
+        change={financialData?.receivablesChange || 0}
         icon={<Landmark className="h-5 w-5" />}
         prefix="$"
+        isLoading={isLoading}
       />
       <MetricCard
-        title="Customers"
-        value={37}
-        change={5.2}
+        title="Contacts"
+        value={financialData?.contactsCount || 0}
+        change={financialData?.contactsChange || 0}
         icon={<Users className="h-5 w-5" />}
+        isLoading={isLoading}
       />
       <MetricCard
         title="Transactions"
-        value={283}
-        change={12.3}
+        value={financialData?.transactionsCount || 0}
+        change={financialData?.transactionsChange || 0}
         icon={<ShoppingCart className="h-5 w-5" />}
+        isLoading={isLoading}
       />
     </div>
   );

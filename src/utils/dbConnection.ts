@@ -1,4 +1,3 @@
-
 // Create an in-memory database implementation that mimics SQLite functionality
 // This is a browser-compatible alternative to better-sqlite3
 
@@ -28,133 +27,22 @@ const lastIds: Record<string, number> = {
 class InMemoryDatabase {
   constructor() {
     console.log('Connected to in-memory database');
-    this.initSampleData();
+    this.initDefaultUser();
   }
 
-  // Initialize with sample data
-  private initSampleData() {
-    // Sample users
+  // Initialize with just a default user for login
+  private initDefaultUser() {
+    // Add a default user for login
     tables.users.push({
       id: ++lastIds.users,
-      name: 'Admin User',
-      email: 'admin@factoryfinance.com',
+      name: 'Personal User',
+      email: 'user@example.com',
       password: 'password',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     });
 
-    // Sample contacts
-    const contactsData = [
-      {
-        name: 'Acme Corporation',
-        type: 'customer',
-        email: 'info@acme.com',
-        phone: '(555) 123-4567',
-        contact_person: 'John Smith',
-        balance: 1250.50
-      },
-      {
-        name: 'Global Supplies Inc',
-        type: 'supplier',
-        email: 'orders@globalsupplies.com',
-        phone: '(555) 987-6543',
-        contact_person: 'Maria Garcia',
-        balance: -450.75
-      },
-      {
-        name: 'Tech Solutions Ltd',
-        type: 'customer',
-        email: 'hello@techsolutions.com',
-        phone: '(555) 234-5678',
-        contact_person: 'David Chen',
-        balance: 2450.50
-      },
-      {
-        name: 'National Bank',
-        type: 'borrower',
-        email: 'support@nationalbank.com',
-        phone: '(555) 876-5432',
-        contact_person: 'Sarah Johnson',
-        balance: -5000.00
-      },
-      {
-        name: 'Smiths Manufacturing',
-        type: 'customer',
-        email: 'orders@smithsmfg.com',
-        phone: '(555) 345-6789',
-        contact_person: 'Robert Williams',
-        balance: 780.25
-      }
-    ];
-
-    contactsData.forEach(contact => {
-      tables.contacts.push({
-        ...contact,
-        id: ++lastIds.contacts,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-    });
-
-    // Sample transactions
-    const transactionsData = [
-      {
-        type: 'sale',
-        amount: 1250.00,
-        date: '2023-05-15',
-        contact_id: 1,
-        reference: 'INV-2023-001',
-        payment_method: 'bank-transfer',
-        description: 'Monthly product delivery'
-      },
-      {
-        type: 'purchase',
-        amount: 450.75,
-        date: '2023-05-14',
-        contact_id: 2,
-        reference: 'PO-2023-042',
-        payment_method: 'check',
-        description: 'Raw materials'
-      },
-      {
-        type: 'payment',
-        amount: 320.00,
-        date: '2023-05-12',
-        contact_id: 4,
-        reference: 'PMT-2023-012',
-        payment_method: 'bank-transfer',
-        description: 'Loan payment'
-      },
-      {
-        type: 'receipt',
-        amount: 2450.50,
-        date: '2023-05-10',
-        contact_id: 3,
-        reference: 'INV-2023-042',
-        payment_method: 'credit-card',
-        description: 'Invoice #INV-2023-042'
-      },
-      {
-        type: 'sale',
-        amount: 780.25,
-        date: '2023-05-08',
-        contact_id: 5,
-        reference: 'CM-458',
-        payment_method: 'cash',
-        description: 'Custom order #CM-458'
-      }
-    ];
-
-    transactionsData.forEach(transaction => {
-      tables.transactions.push({
-        ...transaction,
-        id: ++lastIds.transactions,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-    });
-
-    console.log('Sample data initialized', tables);
+    console.log('Default user initialized');
   }
 
   // Prepare a SQL statement

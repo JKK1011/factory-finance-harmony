@@ -20,7 +20,11 @@ interface Contact {
   type: string;
 }
 
-export function TransactionForm() {
+interface TransactionFormProps {
+  onSuccess?: () => void;
+}
+
+export function TransactionForm({ onSuccess }: TransactionFormProps) {
   const [activeTab, setActiveTab] = useState<TransactionType>('sale');
   const [transaction, setTransaction] = useState({
     type: 'sale' as TransactionType,
@@ -52,8 +56,15 @@ export function TransactionForm() {
     mutationFn: transactionsApi.createTransaction,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions', 'recent'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-overview'] });
       toast.success(`${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} transaction recorded successfully`);
       resetForm();
+      
+      // Call onSuccess callback if provided
+      if (onSuccess) {
+        onSuccess();
+      }
     },
     onError: (error) => {
       toast.error(`Error recording transaction: ${error.message}`);
