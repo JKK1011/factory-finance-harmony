@@ -17,11 +17,11 @@ export function LoginForm() {
   const loginMutation = useMutation({
     mutationFn: async () => {
       try {
-        // Call the login API that connects to SQLite database
+        // Call the login API that connects to our in-memory database
         return await usersApi.loginUser(email, password);
       } catch (error) {
         console.error("Login error:", error);
-        // Still allow demo login if the database fails
+        // Always allow demo login
         if (email === "admin@factoryfinance.com" && password === "password") {
           return { id: 1, email, name: "Admin User" };
         }

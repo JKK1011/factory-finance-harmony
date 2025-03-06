@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,28 +22,26 @@ import {
 } from "@/components/ui/dialog";
 import { Building2, MoreVertical, Plus, Search, User, Phone, Mail, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { contactsApi } from "@/services/api";
+import { contactsApi, Contact } from "@/services/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 type ContactType = 'customer' | 'supplier' | 'borrower';
 
-interface Contact {
-  id: string;
+interface NewContact {
   name: string;
   type: ContactType;
   email: string;
   phone: string;
   contactPerson: string;
-  balance: number;
 }
 
 export function ContactList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<ContactType | 'all'>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newContact, setNewContact] = useState({
+  const [newContact, setNewContact] = useState<NewContact>({
     name: '',
-    type: 'customer' as ContactType,
+    type: 'customer',
     email: '',
     phone: '',
     contactPerson: '',
@@ -95,16 +92,16 @@ export function ContactList() {
     return matchesSearch && matchesTab;
   });
 
-  const handleViewDetails = (id: string) => {
+  const handleViewDetails = (id: string | number) => {
     toast.info(`Viewing details for contact ${id}`);
   };
 
-  const handleEdit = (id: string) => {
+  const handleEdit = (id: string | number) => {
     toast.info(`Editing contact ${id}`);
   };
 
-  const handleDelete = (id: string) => {
-    deleteContactMutation.mutate(id);
+  const handleDelete = (id: string | number) => {
+    deleteContactMutation.mutate(id.toString());
   };
 
   const handleAddContact = () => {
@@ -269,7 +266,7 @@ export function ContactList() {
               </div>
             ) : filteredContacts.length > 0 ? (
               <div className="grid grid-cols-1 divide-y">
-                {filteredContacts.map((contact) => (
+                {filteredContacts.map((contact: Contact) => (
                   <div key={contact.id} className="p-4 flex items-center">
                     <div className="h-10 w-10 rounded-full flex items-center justify-center bg-secondary">
                       <Building2 className="h-5 w-5" />
