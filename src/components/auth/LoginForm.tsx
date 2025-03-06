@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,29 +6,48 @@ import { Label } from "@/components/ui/label";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Building, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useMutation } from "@tanstack/react-query";
+import { usersApi } from "@/services/api";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+
+  const loginMutation = useMutation({
+    mutationFn: async () => {
+      try {
+        // In the actual implementation, this would call the API
+        // For now, we'll keep the demo login behavior until the backend is fully set up
+        if (email === "admin@factoryfinance.com" && password === "password") {
+          // Mock successful login for demo purposes
+          return { id: 1, email, name: "Admin User" };
+        } else {
+          // Try to log in with the database
+          return await usersApi.loginUser(email, password);
+        }
+      } catch (error) {
+        // If the API call fails, still allow demo login
+        if (email === "admin@factoryfinance.com" && password === "password") {
+          return { id: 1, email, name: "Admin User" };
+        }
+        throw error;
+      }
+    },
+    onSuccess: (data) => {
+      // Store user info in localStorage for session management
+      localStorage.setItem('user', JSON.stringify(data));
+      toast.success("Login successful");
+      navigate("/dashboard");
+    },
+    onError: (error) => {
+      toast.error("Invalid credentials. Try admin@factoryfinance.com / password");
+    }
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      // Demo login - in a real app, this would validate credentials against a backend
-      if (email === "admin@factoryfinance.com" && password === "password") {
-        toast.success("Login successful");
-        navigate("/dashboard");
-      } else {
-        toast.error("Invalid credentials. Try admin@factoryfinance.com / password");
-      }
-    }, 1500);
+    loginMutation.mutate();
   };
 
   return (
@@ -57,7 +75,7 @@ export function LoginForm() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
+                disabled={loginMutation.isPending}
               />
             </div>
             
@@ -75,12 +93,12 @@ export function LoginForm() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
+                disabled={loginMutation.isPending}
               />
             </div>
             
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
+            <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+              {loginMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Signing in...

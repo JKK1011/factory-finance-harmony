@@ -1,30 +1,98 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select } from "@/components/ui/select";
 import { CreditCard, Loader2, Receipt, Banknote } from "lucide-react";
 import { toast } from "sonner";
+import { transactionsApi, contactsApi } from "@/services/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 type TransactionType = 'sale' | 'purchase' | 'payment' | 'receipt' | 'expense';
 
-export function TransactionForm() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<TransactionType>('sale');
+interface Contact {
+  id: string;
+  name: string;
+  type: string;
+}
 
+export function TransactionForm() {
+  const [activeTab, setActiveTab] = useState<TransactionType>('sale');
+  const [transaction, setTransaction] = useState({
+    type: 'sale' as TransactionType,
+    amount: '',
+    date: new Date().toISOString().split('T')[0],
+    contactId: '',
+    reference: '',
+    paymentMethod: 'cash',
+    description: ''
+  });
+  
+  const queryClient = useQueryClient();
+  
+  // Fetch contacts for dropdown
+  const { data: contacts = [] } = useQuery({
+    queryKey: ['contacts'],
+    queryFn: contactsApi.getContacts
+  });
+  
+  // Add transaction mutation
+  const addTransactionMutation = useMutation({
+    mutationFn: transactionsApi.createTransaction,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      toast.success(`${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} transaction recorded successfully`);
+      resetForm();
+    },
+    onError: (error) => {
+      toast.error(`Error recording transaction: ${error.message}`);
+    }
+  });
+  
+  useEffect(() => {
+    // Update transaction type when tab changes
+    setTransaction(prev => ({ ...prev, type: activeTab }));
+  }, [activeTab]);
+  
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.success(`${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} transaction recorded successfully`);
-    }, 1000);
+    // Validate form
+    if (!transaction.amount || !transaction.date || !transaction.contactId) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+    
+    // Convert amount to number
+    const payload = {
+      ...transaction,
+      amount: parseFloat(transaction.amount)
+    };
+    
+    addTransactionMutation.mutate(payload);
+  };
+  
+  const resetForm = () => {
+    setTransaction({
+      type: activeTab,
+      amount: '',
+      date: new Date().toISOString().split('T')[0],
+      contactId: '',
+      reference: '',
+      paymentMethod: 'cash',
+      description: ''
+    });
+  };
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { id, value } = e.target;
+    setTransaction(prev => ({
+      ...prev,
+      [id]: value
+    }));
   };
 
   return (
@@ -62,42 +130,73 @@ export function TransactionForm() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="date">Date</Label>
-                  <Input id="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} />
+                  <Input 
+                    id="date" 
+                    type="date" 
+                    value={transaction.date}
+                    onChange={handleInputChange}
+                    required
+                  />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="contact">
+                  <Label htmlFor="contactId">
                     {activeTab === 'sale' && 'Customer'}
                     {activeTab === 'purchase' && 'Supplier'}
                     {activeTab === 'payment' && 'Payee'}
                     {activeTab === 'receipt' && 'Payer'}
                     {activeTab === 'expense' && 'Expense Category'}
                   </Label>
-                  <select id="contact" className="w-full border p-2 rounded-md">
+                  <select 
+                    id="contactId" 
+                    className="w-full border p-2 rounded-md"
+                    value={transaction.contactId}
+                    onChange={handleInputChange}
+                    required
+                  >
                     <option value="">Select...</option>
-                    <option value="1">Acme Corporation</option>
-                    <option value="2">Global Supplies Inc</option>
-                    <option value="3">Tech Solutions Ltd</option>
-                    <option value="4">National Bank</option>
-                    <option value="5">Smiths Manufacturing</option>
+                    {contacts.map((contact: Contact) => (
+                      <option key={contact.id} value={contact.id}>
+                        {contact.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="reference">Reference/Invoice Number</Label>
-                  <Input id="reference" placeholder="e.g., INV-2023-001" />
+                  <Input 
+                    id="reference" 
+                    placeholder="e.g., INV-2023-001" 
+                    value={transaction.reference}
+                    onChange={handleInputChange}
+                  />
                 </div>
               </div>
               
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="amount">Amount ($)</Label>
-                  <Input id="amount" type="number" step="0.01" min="0" placeholder="0.00" />
+                  <Input 
+                    id="amount" 
+                    type="number" 
+                    step="0.01" 
+                    min="0" 
+                    placeholder="0.00" 
+                    value={transaction.amount}
+                    onChange={handleInputChange}
+                    required
+                  />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="payment-method">Payment Method</Label>
-                  <select id="payment-method" className="w-full border p-2 rounded-md">
+                  <Label htmlFor="paymentMethod">Payment Method</Label>
+                  <select 
+                    id="paymentMethod" 
+                    className="w-full border p-2 rounded-md"
+                    value={transaction.paymentMethod}
+                    onChange={handleInputChange}
+                  >
                     <option value="cash">Cash</option>
                     <option value="bank-transfer">Bank Transfer</option>
                     <option value="check">Check</option>
@@ -107,18 +206,23 @@ export function TransactionForm() {
                 
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" placeholder="Transaction details..." />
+                  <Textarea 
+                    id="description" 
+                    placeholder="Transaction details..." 
+                    value={transaction.description}
+                    onChange={handleInputChange}
+                  />
                 </div>
               </div>
             </div>
           </div>
           
           <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline">
+            <Button type="button" variant="outline" onClick={resetForm}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
+            <Button type="submit" disabled={addTransactionMutation.isPending}>
+              {addTransactionMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Processing...

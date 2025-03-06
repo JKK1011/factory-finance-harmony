@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,8 +21,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Building2, MoreVertical, Plus, Search, User, Phone, Mail, FileText } from "lucide-react";
+import { Building2, MoreVertical, Plus, Search, User, Phone, Mail, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { contactsApi } from "@/services/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 type ContactType = 'customer' | 'supplier' | 'borrower';
 
@@ -36,59 +38,51 @@ interface Contact {
   balance: number;
 }
 
-const mockContacts: Contact[] = [
-  {
-    id: '1',
-    name: 'Acme Corporation',
-    type: 'customer',
-    email: 'info@acme.com',
-    phone: '(555) 123-4567',
-    contactPerson: 'John Smith',
-    balance: 1250.50
-  },
-  {
-    id: '2',
-    name: 'Global Supplies Inc',
-    type: 'supplier',
-    email: 'orders@globalsupplies.com',
-    phone: '(555) 987-6543',
-    contactPerson: 'Maria Garcia',
-    balance: -450.75
-  },
-  {
-    id: '3',
-    name: 'Tech Solutions Ltd',
-    type: 'customer',
-    email: 'hello@techsolutions.com',
-    phone: '(555) 234-5678',
-    contactPerson: 'David Chen',
-    balance: 2450.50
-  },
-  {
-    id: '4',
-    name: 'National Bank',
-    type: 'borrower',
-    email: 'support@nationalbank.com',
-    phone: '(555) 876-5432',
-    contactPerson: 'Sarah Johnson',
-    balance: -5000.00
-  },
-  {
-    id: '5',
-    name: 'Smiths Manufacturing',
-    type: 'customer',
-    email: 'orders@smithsmfg.com',
-    phone: '(555) 345-6789',
-    contactPerson: 'Robert Williams',
-    balance: 780.25
-  }
-];
-
 export function ContactList() {
-  const [contacts, setContacts] = useState<Contact[]>(mockContacts);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<ContactType | 'all'>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newContact, setNewContact] = useState({
+    name: '',
+    type: 'customer' as ContactType,
+    email: '',
+    phone: '',
+    contactPerson: '',
+  });
+  
+  const queryClient = useQueryClient();
+  
+  // Fetch contacts from API
+  const { data: contacts = [], isLoading, isError } = useQuery({
+    queryKey: ['contacts'],
+    queryFn: contactsApi.getContacts
+  });
+
+  // Add contact mutation
+  const addContactMutation = useMutation({
+    mutationFn: contactsApi.createContact,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      toast.success("Contact added successfully!");
+      setIsAddDialogOpen(false);
+      resetNewContactForm();
+    },
+    onError: (error) => {
+      toast.error(`Error adding contact: ${error.message}`);
+    }
+  });
+
+  // Delete contact mutation
+  const deleteContactMutation = useMutation({
+    mutationFn: contactsApi.deleteContact,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      toast.success("Contact deleted successfully!");
+    },
+    onError: (error) => {
+      toast.error(`Error deleting contact: ${error.message}`);
+    }
+  });
 
   const filteredContacts = contacts.filter(contact => {
     const matchesSearch = 
@@ -110,14 +104,40 @@ export function ContactList() {
   };
 
   const handleDelete = (id: string) => {
-    toast.success(`Contact ${id} deleted`);
-    setContacts(contacts.filter(contact => contact.id !== id));
+    deleteContactMutation.mutate(id);
   };
 
   const handleAddContact = () => {
-    toast.success("Contact added successfully!");
-    setIsAddDialogOpen(false);
+    addContactMutation.mutate(newContact);
   };
+  
+  const resetNewContactForm = () => {
+    setNewContact({
+      name: '',
+      type: 'customer',
+      email: '',
+      phone: '',
+      contactPerson: '',
+    });
+  };
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { id, value } = e.target;
+    setNewContact(prev => ({
+      ...prev,
+      [id === 'contact-person' ? 'contactPerson' : id]: value
+    }));
+  };
+
+  if (isError) {
+    return (
+      <GlassCard>
+        <div className="p-8 text-center">
+          <p className="text-destructive">Error loading contacts. Please try again later.</p>
+        </div>
+      </GlassCard>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -151,13 +171,24 @@ export function ContactList() {
                 <label htmlFor="name" className="text-right">
                   Name
                 </label>
-                <Input id="name" placeholder="Company name" className="col-span-3" />
+                <Input 
+                  id="name" 
+                  placeholder="Company name" 
+                  className="col-span-3" 
+                  value={newContact.name}
+                  onChange={handleInputChange}
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label htmlFor="type" className="text-right">
                   Type
                 </label>
-                <select id="type" className="col-span-3 border p-2 rounded-md">
+                <select 
+                  id="type" 
+                  className="col-span-3 border p-2 rounded-md"
+                  value={newContact.type}
+                  onChange={handleInputChange}
+                >
                   <option value="customer">Customer</option>
                   <option value="supplier">Supplier</option>
                   <option value="borrower">Borrower</option>
@@ -167,26 +198,55 @@ export function ContactList() {
                 <label htmlFor="contact-person" className="text-right">
                   Contact Person
                 </label>
-                <Input id="contact-person" placeholder="Full name" className="col-span-3" />
+                <Input 
+                  id="contact-person" 
+                  placeholder="Full name" 
+                  className="col-span-3" 
+                  value={newContact.contactPerson}
+                  onChange={handleInputChange}
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label htmlFor="email" className="text-right">
                   Email
                 </label>
-                <Input id="email" type="email" placeholder="Email address" className="col-span-3" />
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="Email address" 
+                  className="col-span-3" 
+                  value={newContact.email}
+                  onChange={handleInputChange}
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label htmlFor="phone" className="text-right">
                   Phone
                 </label>
-                <Input id="phone" placeholder="Phone number" className="col-span-3" />
+                <Input 
+                  id="phone" 
+                  placeholder="Phone number" 
+                  className="col-span-3" 
+                  value={newContact.phone}
+                  onChange={handleInputChange}
+                />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleAddContact}>Add Contact</Button>
+              <Button 
+                onClick={handleAddContact}
+                disabled={addContactMutation.isPending}
+              >
+                {addContactMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : 'Add Contact'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -202,9 +262,14 @@ export function ContactList() {
         
         <TabsContent value="all" className="mt-0">
           <GlassCard className="p-0 overflow-hidden">
-            <div className="grid grid-cols-1 divide-y">
-              {filteredContacts.length > 0 ? (
-                filteredContacts.map((contact) => (
+            {isLoading ? (
+              <div className="p-8 text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                <p className="text-muted-foreground">Loading contacts...</p>
+              </div>
+            ) : filteredContacts.length > 0 ? (
+              <div className="grid grid-cols-1 divide-y">
+                {filteredContacts.map((contact) => (
                   <div key={contact.id} className="p-4 flex items-center">
                     <div className="h-10 w-10 rounded-full flex items-center justify-center bg-secondary">
                       <Building2 className="h-5 w-5" />
@@ -262,19 +327,21 @@ export function ContactList() {
                         <DropdownMenuItem 
                           className="text-destructive focus:text-destructive" 
                           onClick={() => handleDelete(contact.id)}
+                          disabled={deleteContactMutation.isPending}
                         >
-                          Delete
+                          {deleteContactMutation.isPending && contact.id === deleteContactMutation.variables ? 
+                            'Deleting...' : 'Delete'}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                ))
-              ) : (
-                <div className="p-8 text-center">
-                  <p className="text-muted-foreground">No contacts found</p>
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center">
+                <p className="text-muted-foreground">No contacts found</p>
+              </div>
+            )}
           </GlassCard>
         </TabsContent>
         
