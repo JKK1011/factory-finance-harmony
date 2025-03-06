@@ -17,17 +17,11 @@ export function LoginForm() {
   const loginMutation = useMutation({
     mutationFn: async () => {
       try {
-        // In the actual implementation, this would call the API
-        // For now, we'll keep the demo login behavior until the backend is fully set up
-        if (email === "admin@factoryfinance.com" && password === "password") {
-          // Mock successful login for demo purposes
-          return { id: 1, email, name: "Admin User" };
-        } else {
-          // Try to log in with the database
-          return await usersApi.loginUser(email, password);
-        }
+        // Call the login API that connects to SQLite database
+        return await usersApi.loginUser(email, password);
       } catch (error) {
-        // If the API call fails, still allow demo login
+        console.error("Login error:", error);
+        // Still allow demo login if the database fails
         if (email === "admin@factoryfinance.com" && password === "password") {
           return { id: 1, email, name: "Admin User" };
         }

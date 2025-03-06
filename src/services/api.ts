@@ -11,7 +11,7 @@ export const contactsApi = {
   
   // Get contact by ID
   getContactById: async (id: string) => {
-    const result = await query('SELECT * FROM contacts WHERE id = $1', [id]);
+    const result = await query('SELECT * FROM contacts WHERE id = ?', [id]);
     return result.rows[0];
   },
   
@@ -19,7 +19,7 @@ export const contactsApi = {
   createContact: async (contact: any) => {
     const { name, type, email, phone, contactPerson, balance = 0 } = contact;
     const result = await query(
-      'INSERT INTO contacts (name, type, email, phone, contact_person, balance) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      'INSERT INTO contacts (name, type, email, phone, contact_person, balance) VALUES (?, ?, ?, ?, ?, ?) RETURNING *',
       [name, type, email, phone, contactPerson, balance]
     );
     return result.rows[0];
@@ -29,7 +29,7 @@ export const contactsApi = {
   updateContact: async (id: string, contact: any) => {
     const { name, type, email, phone, contactPerson, balance } = contact;
     const result = await query(
-      'UPDATE contacts SET name = $1, type = $2, email = $3, phone = $4, contact_person = $5, balance = $6 WHERE id = $7 RETURNING *',
+      'UPDATE contacts SET name = ?, type = ?, email = ?, phone = ?, contact_person = ?, balance = ? WHERE id = ? RETURNING *',
       [name, type, email, phone, contactPerson, balance, id]
     );
     return result.rows[0];
@@ -37,7 +37,7 @@ export const contactsApi = {
   
   // Delete contact
   deleteContact: async (id: string) => {
-    await query('DELETE FROM contacts WHERE id = $1', [id]);
+    await query('DELETE FROM contacts WHERE id = ?', [id]);
     return { success: true };
   }
 };
@@ -52,7 +52,7 @@ export const transactionsApi = {
   
   // Get transaction by ID
   getTransactionById: async (id: string) => {
-    const result = await query('SELECT * FROM transactions WHERE id = $1', [id]);
+    const result = await query('SELECT * FROM transactions WHERE id = ?', [id]);
     return result.rows[0];
   },
   
@@ -60,7 +60,7 @@ export const transactionsApi = {
   createTransaction: async (transaction: any) => {
     const { type, amount, date, contactId, reference, paymentMethod, description } = transaction;
     const result = await query(
-      'INSERT INTO transactions (type, amount, date, contact_id, reference, payment_method, description) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      'INSERT INTO transactions (type, amount, date, contact_id, reference, payment_method, description) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *',
       [type, amount, date, contactId, reference, paymentMethod, description]
     );
     return result.rows[0];
@@ -70,7 +70,7 @@ export const transactionsApi = {
   updateTransaction: async (id: string, transaction: any) => {
     const { type, amount, date, contactId, reference, paymentMethod, description } = transaction;
     const result = await query(
-      'UPDATE transactions SET type = $1, amount = $2, date = $3, contact_id = $4, reference = $5, payment_method = $6, description = $7 WHERE id = $8 RETURNING *',
+      'UPDATE transactions SET type = ?, amount = ?, date = ?, contact_id = ?, reference = ?, payment_method = ?, description = ? WHERE id = ? RETURNING *',
       [type, amount, date, contactId, reference, paymentMethod, description, id]
     );
     return result.rows[0];
@@ -78,7 +78,7 @@ export const transactionsApi = {
   
   // Delete transaction
   deleteTransaction: async (id: string) => {
-    await query('DELETE FROM transactions WHERE id = $1', [id]);
+    await query('DELETE FROM transactions WHERE id = ?', [id]);
     return { success: true };
   }
 };
@@ -89,7 +89,7 @@ export const usersApi = {
   loginUser: async (email: string, password: string) => {
     // In a real app, you would hash the password and use a secure authentication method
     // This is just a simple example for demonstration
-    const result = await query('SELECT * FROM users WHERE email = $1', [email]);
+    const result = await query('SELECT * FROM users WHERE email = ?', [email]);
     if (result.rows.length === 0) {
       throw new Error('Invalid credentials');
     }
@@ -106,32 +106,33 @@ export const usersApi = {
 export const statsApi = {
   // Get financial summary
   getFinancialSummary: async () => {
-    const salesResult = await query('SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = $1', ['sale']);
-    const expensesResult = await query('SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = $1', ['expense']);
-    const receivablesResult = await query('SELECT COALESCE(SUM(balance), 0) as total FROM contacts WHERE type = $1 AND balance > 0', ['customer']);
-    const payablesResult = await query('SELECT COALESCE(SUM(balance), 0) as total FROM contacts WHERE type = $1 AND balance < 0', ['supplier']);
+    const salesResult = await query('SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = ?', ['sale']);
+    const expensesResult = await query('SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = ?', ['expense']);
+    const receivablesResult = await query('SELECT COALESCE(SUM(balance), 0) as total FROM contacts WHERE type = ? AND balance > 0', ['customer']);
+    const payablesResult = await query('SELECT COALESCE(SUM(balance), 0) as total FROM contacts WHERE type = ? AND balance < 0', ['supplier']);
     
     return {
-      totalSales: salesResult.rows[0].total,
-      totalExpenses: expensesResult.rows[0].total,
-      totalReceivables: receivablesResult.rows[0].total,
-      totalPayables: Math.abs(payablesResult.rows[0].total),
-      netProfit: salesResult.rows[0].total - expensesResult.rows[0].total
+      totalSales: salesResult.rows[0].total || 0,
+      totalExpenses: expensesResult.rows[0].total || 0,
+      totalReceivables: receivablesResult.rows[0].total || 0,
+      totalPayables: Math.abs(payablesResult.rows[0].total || 0),
+      netProfit: (salesResult.rows[0].total || 0) - (expensesResult.rows[0].total || 0)
     };
   },
   
   // Get monthly performance data
   getMonthlyPerformance: async (year: number) => {
+    // SQLite doesn't have EXTRACT() function, so we'll use strftime
     const result = await query(`
       SELECT 
-        EXTRACT(MONTH FROM date) as month,
+        CAST(strftime('%m', date) AS INTEGER) as month,
         SUM(CASE WHEN type = 'sale' THEN amount ELSE 0 END) as sales,
         SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expenses
       FROM transactions
-      WHERE EXTRACT(YEAR FROM date) = $1
+      WHERE strftime('%Y', date) = ?
       GROUP BY month
       ORDER BY month
-    `, [year]);
+    `, [year.toString()]);
     
     return result.rows;
   }
