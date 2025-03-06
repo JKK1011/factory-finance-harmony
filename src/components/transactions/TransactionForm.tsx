@@ -8,11 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, Loader2, Receipt, Banknote } from "lucide-react";
 import { toast } from "sonner";
-import { transactionsApi, contactsApi } from "@/services/api";
+import { transactionsApi, contactsApi, Contact as ApiContact } from "@/services/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 type TransactionType = 'sale' | 'purchase' | 'payment' | 'receipt' | 'expense';
 
+// Define a local Contact interface that ensures id is always treated as string
 interface Contact {
   id: string;
   name: string;
@@ -34,10 +35,17 @@ export function TransactionForm() {
   const queryClient = useQueryClient();
   
   // Fetch contacts for dropdown
-  const { data: contacts = [] } = useQuery({
+  const { data: contactsData = [] } = useQuery({
     queryKey: ['contacts'],
     queryFn: contactsApi.getContacts
   });
+  
+  // Convert ApiContact to local Contact interface, ensuring id is string
+  const contacts: Contact[] = contactsData.map((contact: ApiContact) => ({
+    id: String(contact.id),
+    name: contact.name,
+    type: contact.type
+  }));
   
   // Add transaction mutation
   const addTransactionMutation = useMutation({
