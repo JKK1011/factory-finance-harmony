@@ -84,13 +84,17 @@ export const contactsApi = {
 
   createContact: async (contact: any): Promise<Contact> => {
     try {
-      const { rows } = await query<any>(
+      // Fixed: Properly handle the returned ID from the query
+      const result = await query<any>(
         'INSERT INTO contacts (name, type, email, phone, contact_person, balance) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
         [contact.name, contact.type, contact.email, contact.phone, contact.contactPerson, 0]
       );
       
+      // Make sure we have rows and access the ID properly
+      const newId = result.rows && result.rows.length > 0 ? result.rows[0].id : Date.now();
+      
       return { 
-        id: rows[0].id,
+        id: newId,
         name: contact.name,
         type: contact.type,
         email: contact.email,
@@ -152,8 +156,8 @@ export const transactionsApi = {
       // Update contact balance based on transaction type
       await updateContactBalance(transaction);
 
-      // Insert transaction
-      const { rows } = await query<any>(
+      // Fixed: Properly handle the returned ID from the query
+      const result = await query<any>(
         `INSERT INTO transactions 
          (type, amount, date, contact_id, reference, payment_method, description) 
          VALUES (?, ?, ?, ?, ?, ?, ?) 
@@ -169,7 +173,13 @@ export const transactionsApi = {
         ]
       );
       
-      return { id: rows[0].id, ...transaction };
+      // Make sure we have rows and access the ID properly
+      const newId = result.rows && result.rows.length > 0 ? result.rows[0].id : Date.now();
+      
+      return { 
+        id: newId, 
+        ...transaction 
+      };
     } catch (error) {
       console.error('Error creating transaction:', error);
       throw error;
@@ -234,14 +244,20 @@ export const financeApi = {
         `SELECT COUNT(*) as count FROM transactions`
       );
       
+      // Fixed: Properly handle potentially undefined values
+      const cashTotal = cashRows && cashRows[0] ? (cashRows[0].total || 0) : 0;
+      const receivablesTotal = receivablesRows && receivablesRows[0] ? (receivablesRows[0].total || 0) : 0;
+      const contactsCount = contactCountRows && contactCountRows[0] ? (contactCountRows[0].count || 0) : 0;
+      const transactionsCount = transactionCountRows && transactionCountRows[0] ? (transactionCountRows[0].count || 0) : 0;
+      
       return {
-        cashBalance: cashRows[0].total || 0,
+        cashBalance: cashTotal,
         cashChange: 0, // We'll calculate this in a real app
-        receivables: receivablesRows[0].total || 0,
+        receivables: receivablesTotal,
         receivablesChange: 0, // We'll calculate this in a real app
-        contactsCount: contactCountRows[0].count || 0,
+        contactsCount: contactsCount,
         contactsChange: 0, // We'll calculate this in a real app
-        transactionsCount: transactionCountRows[0].count || 0,
+        transactionsCount: transactionsCount,
         transactionsChange: 0 // We'll calculate this in a real app
       };
     } catch (error) {

@@ -66,7 +66,7 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
         onSuccess();
       }
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Error recording transaction: ${error.message}`);
     }
   });

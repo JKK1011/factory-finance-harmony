@@ -1,4 +1,3 @@
-
 // Create an in-memory database implementation that mimics SQLite functionality
 // This is a browser-compatible alternative to better-sqlite3
 
@@ -7,7 +6,7 @@ type RowData = Record<string, any>;
 type Statement = {
   all: (...params: any[]) => RowData[];
   get: (...params: any[]) => RowData | undefined;
-  run: (...params: any[]) => { changes: number };
+  run: (...params: any[]) => { changes: number; lastID?: number };
 };
 
 // In-memory database tables
@@ -61,7 +60,7 @@ class InMemoryDatabase {
         return results.length > 0 ? results[0] : undefined;
       },
       // For INSERT, UPDATE, DELETE
-      run: (...params: any[]): { changes: number } => {
+      run: (...params: any[]): { changes: number; lastID?: number } => {
         return this.executeModification(sql, params);
       }
     };
@@ -158,7 +157,7 @@ class InMemoryDatabase {
   }
   
   // Execute an INSERT, UPDATE, or DELETE
-  private executeModification(sql: string, params: any[]): { changes: number } {
+  private executeModification(sql: string, params: any[]): { changes: number; lastID?: number } {
     console.log('Executing modification:', sql, params);
     
     const tableName = this.extractTableName(sql);
@@ -184,7 +183,7 @@ class InMemoryDatabase {
       });
       
       tables[tableName].push(newRow);
-      return { changes: 1 };
+      return { changes: 1, lastID: newId };
     }
     
     // Handle UPDATE
@@ -270,8 +269,16 @@ export const query = async <T = Record<string, any>>(text: string, params: any[]
       const result = stmt.run(...params);
       const tableName = text.match(/FROM|INTO|UPDATE\s+(\w+)/i)?.[1]?.toLowerCase() || '';
       
+      // For INSERT queries with RETURNING clause, return the inserted ID
+      if (text.toLowerCase().includes('insert') && text.toLowerCase().includes('returning id') && result.lastID) {
+        return { 
+          rows: [{ id: result.lastID } as unknown as T],
+          rowCount: result.changes
+        };
+      }
+      
       return { 
-        rows: tableName ? [{ id: lastIds[tableName] } as any as T] : [] as T[],
+        rows: [],
         rowCount: result.changes
       };
     }
