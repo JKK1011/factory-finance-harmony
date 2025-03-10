@@ -1,3 +1,4 @@
+
 // Create an in-memory database implementation that mimics SQLite functionality
 // This is a browser-compatible alternative to better-sqlite3
 
@@ -267,8 +268,10 @@ export const query = async <T = Record<string, any>>(text: string, params: any[]
       // For INSERT, UPDATE, DELETE queries
       const stmt = db.prepare(text);
       const result = stmt.run(...params);
+      const tableName = text.match(/FROM|INTO|UPDATE\s+(\w+)/i)?.[1]?.toLowerCase() || '';
+      
       return { 
-        rows: [{ id: lastIds[text.match(/FROM|INTO|UPDATE\s+(\w+)/i)?.[1].toLowerCase() || ''] } as any as T],
+        rows: tableName ? [{ id: lastIds[tableName] } as any as T] : [] as T[],
         rowCount: result.changes
       };
     }

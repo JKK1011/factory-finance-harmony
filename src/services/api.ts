@@ -46,7 +46,7 @@ export interface FinancialOverview {
 
 // Auth API
 export const authApi = {
-  login: async (email: string, password: string): Promise<User> => {
+  loginUser: async (email: string, password: string): Promise<User> => {
     try {
       const { rows } = await query<any>(
         'SELECT * FROM users WHERE email = ? AND password = ? LIMIT 1',

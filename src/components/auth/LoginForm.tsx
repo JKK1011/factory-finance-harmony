@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { Building, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useMutation } from "@tanstack/react-query";
-import { usersApi } from "@/services/api";
+import { authApi } from "@/services/api";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
@@ -18,12 +19,12 @@ export function LoginForm() {
     mutationFn: async () => {
       try {
         // Call the login API that connects to our in-memory database
-        return await usersApi.loginUser(email, password);
+        return await authApi.loginUser(email, password);
       } catch (error) {
         console.error("Login error:", error);
         // Always allow demo login
-        if (email === "admin@factoryfinance.com" && password === "password") {
-          return { id: 1, email, name: "Admin User" };
+        if (email === "user@example.com" && password === "password") {
+          return { id: 1, email, name: "Personal User" };
         }
         throw error;
       }
@@ -35,7 +36,7 @@ export function LoginForm() {
       navigate("/dashboard");
     },
     onError: (error) => {
-      toast.error("Invalid credentials. Try admin@factoryfinance.com / password");
+      toast.error("Invalid credentials. Try user@example.com / password");
     }
   });
 
@@ -53,7 +54,7 @@ export function LoginForm() {
           </div>
           
           <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Factory Finance Manager</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Personal Finance Manager</h1>
             <p className="text-sm text-muted-foreground">
               Enter your credentials to access your account
             </p>
@@ -65,7 +66,7 @@ export function LoginForm() {
               <Input 
                 id="email" 
                 type="email" 
-                placeholder="admin@factoryfinance.com" 
+                placeholder="user@example.com" 
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -104,7 +105,7 @@ export function LoginForm() {
           </form>
           
           <div className="text-xs text-muted-foreground">
-            Demo credentials: admin@factoryfinance.com / password
+            Demo credentials: user@example.com / password
           </div>
         </div>
       </GlassCard>
