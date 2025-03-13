@@ -36,6 +36,8 @@ export interface Transaction {
 export interface FinancialOverview {
   cashBalance: number;
   cashChange: number;
+  bankBalance: number;
+  bankChange: number;
   receivables: number;
   receivablesChange: number;
   contactsCount: number;
@@ -78,6 +80,16 @@ export const contactsApi = {
       return rows;
     } catch (error) {
       console.error('Error fetching contacts:', error);
+      throw error;
+    }
+  },
+
+  getContactsByType: async (type: string): Promise<Contact[]> => {
+    try {
+      const { rows } = await query<any>('SELECT * FROM contacts WHERE type = ? ORDER BY name ASC', [type]);
+      return rows;
+    } catch (error) {
+      console.error('Error fetching contacts by type:', error);
       throw error;
     }
   },
@@ -153,8 +165,15 @@ export const transactionsApi = {
 
   createTransaction: async (transaction: any): Promise<any> => {
     try {
-      // Update contact balance based on transaction type
-      await updateContactBalance(transaction);
+      // For sales and purchases, just record the transaction without affecting account balances
+      if (transaction.type === 'sale' || transaction.type === 'purchase') {
+        // Only update contact balance
+        await updateContactBalance(transaction);
+      } else {
+        // For payments, receipts, and expenses, update both contact and cash/bank balances
+        await updateContactBalance(transaction);
+        await updateAccountBalance(transaction);
+      }
 
       // Fixed: Properly handle the returned ID from the query
       const result = await query<any>(
@@ -197,13 +216,23 @@ export const transactionsApi = {
       if (transactionRows.length > 0) {
         const transaction = transactionRows[0];
         
-        // Reverse the balance effect
+        // Reverse the balance effect on contacts
         await updateContactBalance({
           ...transaction,
           amount: transaction.amount,
           contactId: transaction.contact_id,
           type: reverseTransactionType(transaction.type)
         });
+        
+        // Reverse the balance effect on accounts (cash/bank)
+        if (transaction.type === 'payment' || transaction.type === 'receipt' || transaction.type === 'expense') {
+          await updateAccountBalance({
+            ...transaction,
+            amount: transaction.amount,
+            paymentMethod: transaction.payment_method,
+            type: reverseTransactionType(transaction.type)
+          });
+        }
         
         // Delete the transaction
         await query('DELETE FROM transactions WHERE id = ?', [id]);
@@ -219,13 +248,29 @@ export const transactionsApi = {
 export const financeApi = {
   getFinancialOverview: async (): Promise<FinancialOverview> => {
     try {
-      // Get total cash balance (sum of all transactions)
+      // Get cash balance (sum of cash transactions)
       const { rows: cashRows } = await query<any>(
         `SELECT SUM(CASE 
-           WHEN type IN ('sale', 'receipt') THEN amount 
-           WHEN type IN ('purchase', 'payment', 'expense') THEN -amount 
-           ELSE 0 
-         END) as total 
+           WHEN (type = 'receipt' OR type = 'payment' OR type = 'expense') AND payment_method = 'cash' THEN
+             CASE
+               WHEN type = 'receipt' THEN amount
+               WHEN type IN ('payment', 'expense') THEN -amount
+             END
+           ELSE 0
+         END) as total
+         FROM transactions`
+      );
+      
+      // Get bank balance (sum of bank transfer transactions)
+      const { rows: bankRows } = await query<any>(
+        `SELECT SUM(CASE 
+           WHEN (type = 'receipt' OR type = 'payment' OR type = 'expense') AND payment_method = 'bank-transfer' THEN
+             CASE
+               WHEN type = 'receipt' THEN amount
+               WHEN type IN ('payment', 'expense') THEN -amount
+             END
+           ELSE 0
+         END) as total
          FROM transactions`
       );
       
@@ -246,6 +291,7 @@ export const financeApi = {
       
       // Fixed: Properly handle potentially undefined values
       const cashTotal = cashRows && cashRows[0] ? (cashRows[0].total || 0) : 0;
+      const bankTotal = bankRows && bankRows[0] ? (bankRows[0].total || 0) : 0;
       const receivablesTotal = receivablesRows && receivablesRows[0] ? (receivablesRows[0].total || 0) : 0;
       const contactsCount = contactCountRows && contactCountRows[0] ? (contactCountRows[0].count || 0) : 0;
       const transactionsCount = transactionCountRows && transactionCountRows[0] ? (transactionCountRows[0].count || 0) : 0;
@@ -253,6 +299,8 @@ export const financeApi = {
       return {
         cashBalance: cashTotal,
         cashChange: 0, // We'll calculate this in a real app
+        bankBalance: bankTotal,
+        bankChange: 0, // We'll calculate this in a real app
         receivables: receivablesTotal,
         receivablesChange: 0, // We'll calculate this in a real app
         contactsCount: contactsCount,
@@ -297,6 +345,18 @@ async function updateContactBalance(transaction: any): Promise<void> {
     'UPDATE contacts SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
     [balanceChange, transaction.contactId]
   );
+}
+
+// New helper function to update cash or bank balance based on transaction type and payment method
+async function updateAccountBalance(transaction: any): Promise<void> {
+  // Only process transactions that affect account balances (payments, receipts, expenses)
+  if (transaction.type !== 'payment' && transaction.type !== 'receipt' && transaction.type !== 'expense') {
+    return;
+  }
+  
+  // Cash and bank balances are tracked through transactions themselves, not in a separate table
+  // The balances are calculated by summing all relevant transactions
+  // This is handled in the getFinancialOverview method
 }
 
 // Helper function to get the reverse transaction type for deletion

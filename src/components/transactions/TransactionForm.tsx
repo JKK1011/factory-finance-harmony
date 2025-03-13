@@ -114,6 +114,11 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
     }));
   };
 
+  // Function to determine if payment method is applicable for this transaction type
+  const showPaymentMethod = () => {
+    return activeTab === 'payment' || activeTab === 'receipt' || activeTab === 'expense';
+  };
+
   return (
     <Tabs defaultValue="sale" onValueChange={(value) => setActiveTab(value as TransactionType)}>
       <TabsList className="mb-6 w-full grid grid-cols-3 md:grid-cols-5">
@@ -208,20 +213,20 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
                   />
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="paymentMethod">Payment Method</Label>
-                  <select 
-                    id="paymentMethod" 
-                    className="w-full border p-2 rounded-md"
-                    value={transaction.paymentMethod}
-                    onChange={handleInputChange}
-                  >
-                    <option value="cash">Cash</option>
-                    <option value="bank-transfer">Bank Transfer</option>
-                    <option value="check">Check</option>
-                    <option value="credit-card">Credit Card</option>
-                  </select>
-                </div>
+                {showPaymentMethod() && (
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentMethod">Payment Method</Label>
+                    <select 
+                      id="paymentMethod" 
+                      className="w-full border p-2 rounded-md"
+                      value={transaction.paymentMethod}
+                      onChange={handleInputChange}
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="bank-transfer">Bank Transfer</option>
+                    </select>
+                  </div>
+                )}
                 
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>

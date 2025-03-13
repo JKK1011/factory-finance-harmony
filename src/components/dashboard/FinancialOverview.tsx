@@ -9,6 +9,7 @@ import {
   ShoppingCart, 
   Landmark, 
   DollarSign,
+  CreditCard,
   Loader2
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -72,12 +73,20 @@ export function FinancialOverview() {
   });
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
       <MetricCard
         title="Cash Balance"
         value={financialData?.cashBalance || 0}
         change={financialData?.cashChange || 0}
         icon={<DollarSign className="h-5 w-5" />}
+        prefix="$"
+        isLoading={isLoading}
+      />
+      <MetricCard
+        title="Bank Balance"
+        value={financialData?.bankBalance || 0}
+        change={financialData?.bankChange || 0}
+        icon={<CreditCard className="h-5 w-5" />}
         prefix="$"
         isLoading={isLoading}
       />
