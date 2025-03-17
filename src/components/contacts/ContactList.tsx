@@ -35,9 +35,13 @@ interface NewContact {
   contactPerson: string;
 }
 
-export function ContactList() {
+interface ContactListProps {
+  filterType?: string;
+}
+
+export function ContactList({ filterType = '' }: ContactListProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<ContactType | 'all'>('all');
+  const [activeTab, setActiveTab] = useState<ContactType | 'all'>(filterType as ContactType | 'all' || 'all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newContact, setNewContact] = useState<NewContact>({
     name: '',
@@ -89,7 +93,9 @@ export function ContactList() {
     
     const matchesTab = activeTab === 'all' || contact.type === activeTab;
     
-    return matchesSearch && matchesTab;
+    const matchesExternalFilter = !filterType || contact.type === filterType;
+    
+    return matchesSearch && matchesTab && matchesExternalFilter;
   });
 
   const handleViewDetails = (id: string | number) => {
@@ -249,111 +255,174 @@ export function ContactList() {
         </Dialog>
       </div>
       
-      <Tabs defaultValue="all" onValueChange={(value) => setActiveTab(value as ContactType | 'all')}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="customer">Customers</TabsTrigger>
-          <TabsTrigger value="supplier">Suppliers</TabsTrigger>
-          <TabsTrigger value="borrower">Borrowers</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="all" className="mt-0">
-          <GlassCard className="p-0 overflow-hidden">
-            {isLoading ? (
-              <div className="p-8 text-center">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-                <p className="text-muted-foreground">Loading contacts...</p>
-              </div>
-            ) : filteredContacts.length > 0 ? (
-              <div className="grid grid-cols-1 divide-y">
-                {filteredContacts.map((contact: Contact) => (
-                  <div key={contact.id} className="p-4 flex items-center">
-                    <div className="h-10 w-10 rounded-full flex items-center justify-center bg-secondary">
-                      <Building2 className="h-5 w-5" />
-                    </div>
-                    
-                    <div className="ml-4 flex-1">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="font-medium">{contact.name}</p>
-                          <div className="flex items-center text-sm text-muted-foreground">
-                            <User className="h-3.5 w-3.5 mr-1" />
-                            <span>{contact.contactPerson}</span>
-                          </div>
-                        </div>
-                        
-                        <div className="flex flex-col items-end mt-2 sm:mt-0">
-                          <span className={`font-medium ${contact.balance >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {contact.balance >= 0 ? '+' : ''}${contact.balance.toFixed(2)}
-                          </span>
-                          <span className="text-xs capitalize text-muted-foreground">
-                            {contact.type}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-2 text-sm text-muted-foreground">
-                        <div className="flex items-center">
-                          <Mail className="h-3.5 w-3.5 mr-1" />
-                          <span>{contact.email}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <Phone className="h-3.5 w-3.5 mr-1" />
-                          <span>{contact.phone}</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleViewDetails(contact.id)}>
-                          <FileText className="h-4 w-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(contact.id)}>
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          className="text-destructive focus:text-destructive" 
-                          onClick={() => handleDelete(contact.id)}
-                          disabled={deleteContactMutation.isPending}
-                        >
-                          {deleteContactMutation.isPending && contact.id === deleteContactMutation.variables ? 
-                            'Deleting...' : 'Delete'}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-8 text-center">
-                <p className="text-muted-foreground">No contacts found</p>
-              </div>
-            )}
-          </GlassCard>
-        </TabsContent>
-        
-        <TabsContent value="customer" className="mt-0">
-          {/* Same structure as "all" but filtered for customers only */}
-        </TabsContent>
-        
-        <TabsContent value="supplier" className="mt-0">
-          {/* Same structure as "all" but filtered for suppliers only */}
-        </TabsContent>
-        
-        <TabsContent value="borrower" className="mt-0">
-          {/* Same structure as "all" but filtered for borrowers only */}
-        </TabsContent>
-      </Tabs>
+      {!filterType && (
+        <Tabs defaultValue="all" onValueChange={(value) => setActiveTab(value as ContactType | 'all')}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="customer">Customers</TabsTrigger>
+            <TabsTrigger value="supplier">Suppliers</TabsTrigger>
+            <TabsTrigger value="borrower">Borrowers</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="all" className="mt-0">
+            <ContactListContent
+              contacts={filteredContacts}
+              isLoading={isLoading}
+              onViewDetails={handleViewDetails}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              deleteContactMutation={deleteContactMutation}
+            />
+          </TabsContent>
+          
+          <TabsContent value="customer" className="mt-0">
+            <ContactListContent
+              contacts={filteredContacts}
+              isLoading={isLoading}
+              onViewDetails={handleViewDetails}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              deleteContactMutation={deleteContactMutation}
+            />
+          </TabsContent>
+          
+          <TabsContent value="supplier" className="mt-0">
+            <ContactListContent
+              contacts={filteredContacts}
+              isLoading={isLoading}
+              onViewDetails={handleViewDetails}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              deleteContactMutation={deleteContactMutation}
+            />
+          </TabsContent>
+          
+          <TabsContent value="borrower" className="mt-0">
+            <ContactListContent
+              contacts={filteredContacts}
+              isLoading={isLoading}
+              onViewDetails={handleViewDetails}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              deleteContactMutation={deleteContactMutation}
+            />
+          </TabsContent>
+        </Tabs>
+      )}
+      
+      {filterType && (
+        <ContactListContent
+          contacts={filteredContacts}
+          isLoading={isLoading}
+          onViewDetails={handleViewDetails}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          deleteContactMutation={deleteContactMutation}
+        />
+      )}
     </div>
+  );
+}
+
+interface ContactListContentProps {
+  contacts: Contact[];
+  isLoading: boolean;
+  onViewDetails: (id: string | number) => void;
+  onEdit: (id: string | number) => void;
+  onDelete: (id: string | number) => void;
+  deleteContactMutation: any;
+}
+
+function ContactListContent({
+  contacts,
+  isLoading,
+  onViewDetails,
+  onEdit,
+  onDelete,
+  deleteContactMutation
+}: ContactListContentProps) {
+  return (
+    <GlassCard className="p-0 overflow-hidden">
+      {isLoading ? (
+        <div className="p-8 text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading contacts...</p>
+        </div>
+      ) : contacts.length > 0 ? (
+        <div className="grid grid-cols-1 divide-y">
+          {contacts.map((contact: Contact) => (
+            <div key={contact.id} className="p-4 flex items-center">
+              <div className="h-10 w-10 rounded-full flex items-center justify-center bg-secondary">
+                <Building2 className="h-5 w-5" />
+              </div>
+              
+              <div className="ml-4 flex-1">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium">{contact.name}</p>
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <User className="h-3.5 w-3.5 mr-1" />
+                      <span>{contact.contactPerson}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col items-end mt-2 sm:mt-0">
+                    <span className={`font-medium ${contact.balance >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      {contact.balance >= 0 ? '+' : ''}${contact.balance.toFixed(2)}
+                    </span>
+                    <span className="text-xs capitalize text-muted-foreground">
+                      {contact.type}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-2 text-sm text-muted-foreground">
+                  <div className="flex items-center">
+                    <Mail className="h-3.5 w-3.5 mr-1" />
+                    <span>{contact.email}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Phone className="h-3.5 w-3.5 mr-1" />
+                    <span>{contact.phone}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onViewDetails(contact.id)}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    View Details
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onEdit(contact.id)}>
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    className="text-destructive focus:text-destructive" 
+                    onClick={() => onDelete(contact.id)}
+                    disabled={deleteContactMutation.isPending}
+                  >
+                    {deleteContactMutation.isPending && contact.id === deleteContactMutation.variables ? 
+                      'Deleting...' : 'Delete'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="p-8 text-center">
+          <p className="text-muted-foreground">No contacts found</p>
+        </div>
+      )}
+    </GlassCard>
   );
 }
