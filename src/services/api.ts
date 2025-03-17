@@ -165,14 +165,58 @@ export const transactionsApi = {
 
   createTransaction: async (transaction: any): Promise<any> => {
     try {
-      // For sales and purchases, just record the transaction without affecting account balances
-      if (transaction.type === 'sale' || transaction.type === 'purchase') {
-        // Only update contact balance
-        await updateContactBalance(transaction);
-      } else {
-        // For payments, receipts, and expenses, update both contact and cash/bank balances
-        await updateContactBalance(transaction);
-        await updateAccountBalance(transaction);
+      // For sales, simply increase the contact's balance (receivable)
+      if (transaction.type === 'sale') {
+        await updateContactBalance({
+          ...transaction,
+          // Sales increase receivables (positive balance for customers)
+          amount: transaction.amount
+        });
+      } 
+      // For purchases, simply decrease the contact's balance (payable)
+      else if (transaction.type === 'purchase') {
+        await updateContactBalance({
+          ...transaction,
+          // Purchases decrease balance (negative balance means we owe them)
+          amount: -transaction.amount
+        });
+      } 
+      // For payments, receipts, and expenses, update both contact and cash/bank balances
+      else {
+        // For payments, we pay money to suppliers (decreases our cash/bank, decreases what we owe)
+        if (transaction.type === 'payment') {
+          await updateContactBalance({
+            ...transaction,
+            // Payment to supplier reduces what we owe them (increases their balance)
+            amount: transaction.amount
+          });
+          await updateAccountBalance({
+            ...transaction,
+            // Payment reduces our cash/bank balance
+            amount: -transaction.amount
+          });
+        } 
+        // For receipts, we receive money from customers (increases our cash/bank, decreases what they owe)
+        else if (transaction.type === 'receipt') {
+          await updateContactBalance({
+            ...transaction,
+            // Receipt from customer reduces what they owe us (decreases their balance)
+            amount: -transaction.amount
+          });
+          await updateAccountBalance({
+            ...transaction,
+            // Receipt increases our cash/bank balance
+            amount: transaction.amount
+          });
+        }
+        // For expenses, only update cash/bank balance (no contact balance affected)
+        else if (transaction.type === 'expense') {
+          await updateAccountBalance({
+            ...transaction,
+            // Expense reduces our cash/bank balance
+            amount: -transaction.amount
+          });
+        }
       }
 
       // Fixed: Properly handle the returned ID from the query
@@ -216,21 +260,55 @@ export const transactionsApi = {
       if (transactionRows.length > 0) {
         const transaction = transactionRows[0];
         
-        // Reverse the balance effect on contacts
-        await updateContactBalance({
-          ...transaction,
-          amount: transaction.amount,
-          contactId: transaction.contact_id,
-          type: reverseTransactionType(transaction.type)
-        });
-        
-        // Reverse the balance effect on accounts (cash/bank)
-        if (transaction.type === 'payment' || transaction.type === 'receipt' || transaction.type === 'expense') {
+        // Reverse the balance effect based on transaction type
+        if (transaction.type === 'sale') {
+          // Reverse the sale (decrease receivable)
+          await updateContactBalance({
+            ...transaction,
+            contactId: transaction.contact_id,
+            amount: -transaction.amount
+          });
+        } 
+        else if (transaction.type === 'purchase') {
+          // Reverse the purchase (increase payable)
+          await updateContactBalance({
+            ...transaction,
+            contactId: transaction.contact_id,
+            amount: transaction.amount
+          });
+        }
+        else if (transaction.type === 'payment') {
+          // Reverse payment (decrease what the supplier owes us, increase our cash/bank)
+          await updateContactBalance({
+            ...transaction,
+            contactId: transaction.contact_id,
+            amount: -transaction.amount
+          });
           await updateAccountBalance({
             ...transaction,
-            amount: transaction.amount,
             paymentMethod: transaction.payment_method,
-            type: reverseTransactionType(transaction.type)
+            amount: transaction.amount
+          });
+        }
+        else if (transaction.type === 'receipt') {
+          // Reverse receipt (increase what the customer owes us, decrease our cash/bank)
+          await updateContactBalance({
+            ...transaction,
+            contactId: transaction.contact_id,
+            amount: transaction.amount
+          });
+          await updateAccountBalance({
+            ...transaction,
+            paymentMethod: transaction.payment_method,
+            amount: -transaction.amount
+          });
+        }
+        else if (transaction.type === 'expense') {
+          // Reverse expense (increase our cash/bank)
+          await updateAccountBalance({
+            ...transaction,
+            paymentMethod: transaction.payment_method,
+            amount: transaction.amount
           });
         }
         
@@ -319,44 +397,27 @@ export const financeApi = {
 async function updateContactBalance(transaction: any): Promise<void> {
   if (!transaction.contactId) return;
   
-  let balanceChange = 0;
-  
-  // Calculate balance change based on transaction type
-  switch (transaction.type) {
-    case 'sale':
-      balanceChange = transaction.amount;
-      break;
-    case 'receipt':
-      balanceChange = -transaction.amount;
-      break;
-    case 'purchase':
-      balanceChange = -transaction.amount;
-      break;
-    case 'payment':
-      balanceChange = transaction.amount;
-      break;
-    case 'expense':
-      // Expenses typically don't affect contact balances
-      return;
-  }
-  
-  // Update contact balance
+  // Update contact balance directly with the provided amount
+  // For sales: positive amount increases customer balance (they owe us more)
+  // For purchases: negative amount decreases supplier balance (we owe them more)
+  // For payments: positive amount increases supplier balance (we owe them less)
+  // For receipts: negative amount decreases customer balance (they owe us less)
   await query(
     'UPDATE contacts SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    [balanceChange, transaction.contactId]
+    [transaction.amount, transaction.contactId]
   );
 }
 
-// New helper function to update cash or bank balance based on transaction type and payment method
+// Helper function to update cash or bank balance based on payment method
 async function updateAccountBalance(transaction: any): Promise<void> {
   // Only process transactions that affect account balances (payments, receipts, expenses)
   if (transaction.type !== 'payment' && transaction.type !== 'receipt' && transaction.type !== 'expense') {
     return;
   }
   
-  // Cash and bank balances are tracked through transactions themselves, not in a separate table
-  // The balances are calculated by summing all relevant transactions
-  // This is handled in the getFinancialOverview method
+  // Note: Cash and bank balances are calculated in the getFinancialOverview method
+  // We don't need to update any specific table for this, as the balances are
+  // calculated by summing relevant transactions with the correct payment method
 }
 
 // Helper function to get the reverse transaction type for deletion
