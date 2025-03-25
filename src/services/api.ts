@@ -1,4 +1,3 @@
-
 import { query } from '@/utils/dbConnection';
 
 // Define our types
@@ -40,10 +39,8 @@ export interface FinancialOverview {
   bankChange: number;
   receivables: number;
   receivablesChange: number;
-  contactsCount: number;
-  contactsChange: number;
-  transactionsCount: number;
-  transactionsChange: number;
+  payables: number;
+  payablesChange: number;
 }
 
 // Auth API
@@ -96,13 +93,11 @@ export const contactsApi = {
 
   createContact: async (contact: any): Promise<Contact> => {
     try {
-      // Fixed: Properly handle the returned ID from the query
       const result = await query<any>(
         'INSERT INTO contacts (name, type, email, phone, contact_person, balance) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
         [contact.name, contact.type, contact.email, contact.phone, contact.contactPerson, 0]
       );
       
-      // Make sure we have rows and access the ID properly
       const newId = result.rows && result.rows.length > 0 ? result.rows[0].id : Date.now();
       
       return { 
@@ -219,7 +214,6 @@ export const transactionsApi = {
         }
       }
 
-      // Fixed: Properly handle the returned ID from the query
       const result = await query<any>(
         `INSERT INTO transactions 
          (type, amount, date, contact_id, reference, payment_method, description) 
@@ -236,7 +230,6 @@ export const transactionsApi = {
         ]
       );
       
-      // Make sure we have rows and access the ID properly
       const newId = result.rows && result.rows.length > 0 ? result.rows[0].id : Date.now();
       
       return { 
@@ -357,22 +350,16 @@ export const financeApi = {
         `SELECT SUM(balance) as total FROM contacts WHERE type = 'customer' AND balance > 0`
       );
       
-      // Get contact count
-      const { rows: contactCountRows } = await query<any>(
-        `SELECT COUNT(*) as count FROM contacts`
-      );
-      
-      // Get transaction count
-      const { rows: transactionCountRows } = await query<any>(
-        `SELECT COUNT(*) as count FROM transactions`
+      // Get total payables (sum of supplier balances)
+      const { rows: payablesRows } = await query<any>(
+        `SELECT SUM(ABS(balance)) as total FROM contacts WHERE type = 'supplier' AND balance < 0`
       );
       
       // Fixed: Properly handle potentially undefined values
       const cashTotal = cashRows && cashRows[0] ? (cashRows[0].total || 0) : 0;
       const bankTotal = bankRows && bankRows[0] ? (bankRows[0].total || 0) : 0;
       const receivablesTotal = receivablesRows && receivablesRows[0] ? (receivablesRows[0].total || 0) : 0;
-      const contactsCount = contactCountRows && contactCountRows[0] ? (contactCountRows[0].count || 0) : 0;
-      const transactionsCount = transactionCountRows && transactionCountRows[0] ? (transactionCountRows[0].count || 0) : 0;
+      const payablesTotal = payablesRows && payablesRows[0] ? (payablesRows[0].total || 0) : 0;
       
       return {
         cashBalance: cashTotal,
@@ -381,10 +368,8 @@ export const financeApi = {
         bankChange: 0, // We'll calculate this in a real app
         receivables: receivablesTotal,
         receivablesChange: 0, // We'll calculate this in a real app
-        contactsCount: contactsCount,
-        contactsChange: 0, // We'll calculate this in a real app
-        transactionsCount: transactionsCount,
-        transactionsChange: 0 // We'll calculate this in a real app
+        payables: payablesTotal,
+        payablesChange: 0 // We'll calculate this in a real app
       };
     } catch (error) {
       console.error('Error fetching financial overview:', error);
@@ -431,3 +416,4 @@ function reverseTransactionType(type: string): string {
     default: return type;
   }
 }
+

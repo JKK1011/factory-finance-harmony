@@ -8,6 +8,7 @@ import {
   Landmark, 
   DollarSign,
   CreditCard,
+  TrendingDown,
   Loader2
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -71,7 +72,7 @@ export function FinancialOverview() {
   });
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <MetricCard
         title="Cash Balance"
         value={financialData?.cashBalance || 0}
@@ -93,6 +94,14 @@ export function FinancialOverview() {
         value={financialData?.receivables || 0}
         change={financialData?.receivablesChange || 0}
         icon={<Landmark className="h-5 w-5" />}
+        prefix="$"
+        isLoading={isLoading}
+      />
+      <MetricCard
+        title="Payables"
+        value={financialData?.payables || 0}
+        change={financialData?.payablesChange || 0}
+        icon={<TrendingDown className="h-5 w-5" />}
         prefix="$"
         isLoading={isLoading}
       />
