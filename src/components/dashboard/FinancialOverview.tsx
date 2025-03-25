@@ -4,9 +4,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { 
   ArrowUpRight, 
-  ArrowDownRight, 
-  Users, 
-  ShoppingCart, 
+  ArrowDownRight,
   Landmark, 
   DollarSign,
   CreditCard,
@@ -73,7 +71,7 @@ export function FinancialOverview() {
   });
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <MetricCard
         title="Cash Balance"
         value={financialData?.cashBalance || 0}
@@ -96,20 +94,6 @@ export function FinancialOverview() {
         change={financialData?.receivablesChange || 0}
         icon={<Landmark className="h-5 w-5" />}
         prefix="$"
-        isLoading={isLoading}
-      />
-      <MetricCard
-        title="Contacts"
-        value={financialData?.contactsCount || 0}
-        change={financialData?.contactsChange || 0}
-        icon={<Users className="h-5 w-5" />}
-        isLoading={isLoading}
-      />
-      <MetricCard
-        title="Transactions"
-        value={financialData?.transactionsCount || 0}
-        change={financialData?.transactionsChange || 0}
-        icon={<ShoppingCart className="h-5 w-5" />}
         isLoading={isLoading}
       />
     </div>
