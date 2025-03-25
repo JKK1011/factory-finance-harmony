@@ -1,3 +1,4 @@
+
 // Create an in-memory database implementation that mimics SQLite functionality
 // This is a browser-compatible alternative to better-sqlite3
 
@@ -27,11 +28,11 @@ const lastIds: Record<string, number> = {
 class InMemoryDatabase {
   constructor() {
     console.log('Connected to in-memory database');
-    this.initDefaultUser();
+    this.initSchema();
   }
 
-  // Initialize with just a default user for login
-  private initDefaultUser() {
+  // Initialize database schema and default user
+  private initSchema() {
     // Add a default user for login
     tables.users.push({
       id: ++lastIds.users,
@@ -42,7 +43,7 @@ class InMemoryDatabase {
       updated_at: new Date().toISOString()
     });
 
-    console.log('Default user initialized');
+    console.log('Database schema initialized with default user');
   }
 
   // Prepare a SQL statement
@@ -150,6 +151,15 @@ class InMemoryDatabase {
             return a[orderField] < b[orderField] ? 1 : -1;
           }
         });
+      }
+    }
+    
+    // Handle LIMIT
+    if (sql.toLowerCase().includes('limit')) {
+      const limitMatch = sql.match(/LIMIT\s+(\d+)/i);
+      if (limitMatch) {
+        const limit = parseInt(limitMatch[1]);
+        results = results.slice(0, limit);
       }
     }
     
