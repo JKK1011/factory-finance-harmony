@@ -41,6 +41,7 @@ export interface FinancialOverview {
   receivablesChange: number;
   payables: number;
   payablesChange: number;
+  transactionsCount: number;
 }
 
 // Auth API
@@ -355,11 +356,17 @@ export const financeApi = {
         `SELECT SUM(ABS(balance)) as total FROM contacts WHERE type = 'supplier' AND balance < 0`
       );
       
+      // Get total transaction count
+      const { rows: transactionCountRows } = await query<any>(
+        `SELECT COUNT(*) as count FROM transactions`
+      );
+      
       // Fixed: Properly handle potentially undefined values
       const cashTotal = cashRows && cashRows[0] ? (cashRows[0].total || 0) : 0;
       const bankTotal = bankRows && bankRows[0] ? (bankRows[0].total || 0) : 0;
       const receivablesTotal = receivablesRows && receivablesRows[0] ? (receivablesRows[0].total || 0) : 0;
       const payablesTotal = payablesRows && payablesRows[0] ? (payablesRows[0].total || 0) : 0;
+      const transactionsCount = transactionCountRows && transactionCountRows[0] ? (transactionCountRows[0].count || 0) : 0;
       
       return {
         cashBalance: cashTotal,
@@ -369,7 +376,8 @@ export const financeApi = {
         receivables: receivablesTotal,
         receivablesChange: 0, // We'll calculate this in a real app
         payables: payablesTotal,
-        payablesChange: 0 // We'll calculate this in a real app
+        payablesChange: 0, // We'll calculate this in a real app
+        transactionsCount: transactionsCount
       };
     } catch (error) {
       console.error('Error fetching financial overview:', error);
@@ -416,4 +424,3 @@ function reverseTransactionType(type: string): string {
     default: return type;
   }
 }
-
