@@ -1,17 +1,21 @@
-
 import React, { useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Download, Calendar, Loader2 } from "lucide-react";
+import { FileText, Download, Calendar, Loader2, FilePdf } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { financeApi, transactionsApi, contactsApi } from "@/services/api";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { ReportViewer } from "@/components/reports/ReportViewer";
+import { reportsService, ReportData } from "@/services/reports";
 
 const Reports = () => {
   const [reportPeriod, setReportPeriod] = useState("30");
+  const [currentReport, setCurrentReport] = useState<ReportData | null>(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   
   // Fetch financial overview
   const { data: financialData, isLoading: isLoadingFinancial } = useQuery({
@@ -37,11 +41,57 @@ const Reports = () => {
   });
 
   const handleExport = (reportType: string) => {
-    toast.success(`${reportType} exported successfully.`);
+    // Generate report first, then export
+    generateReport(reportType, true);
   };
   
-  const handleGenerateReport = (reportType: string) => {
-    toast.success(`${reportType} report generated successfully.`);
+  const generateReport = async (reportType: string, exportAfter: boolean = false) => {
+    setIsGeneratingReport(true);
+    
+    try {
+      let reportData: ReportData | null = null;
+      
+      // Generate the appropriate report based on type
+      switch (reportType) {
+        case "Profit & Loss Statement":
+          reportData = await reportsService.generateProfitLossStatement(reportPeriod);
+          break;
+        case "Balance Sheet":
+          reportData = await reportsService.generateBalanceSheet();
+          break;
+        case "Cash Flow Statement":
+          reportData = await reportsService.generateCashFlowStatement(reportPeriod);
+          break;
+        case "Customer Ledger":
+          reportData = await reportsService.generateCustomerLedger();
+          break;
+        case "Supplier Ledger":
+          reportData = await reportsService.generateSupplierLedger();
+          break;
+        case "Tax Summary":
+          reportData = await reportsService.generateTaxSummary(reportPeriod);
+          break;
+        default:
+          throw new Error("Invalid report type");
+      }
+      
+      setCurrentReport(reportData);
+      
+      if (exportAfter) {
+        // If export was requested, automatically download
+        downloadPdf(reportData);
+      } else {
+        // Otherwise show the report
+        setIsReportModalOpen(true);
+      }
+      
+      toast.success(`${reportType} generated successfully.`);
+    } catch (error) {
+      console.error("Error generating report:", error);
+      toast.error(`Error generating ${reportType}.`);
+    } finally {
+      setIsGeneratingReport(false);
+    }
   };
   
   const handleChangePeriod = () => {
@@ -55,6 +105,49 @@ const Reports = () => {
     
     setReportPeriod(periods[reportPeriod] || "30");
     toast.info(`Reporting period changed to ${periods[reportPeriod] || "30"} days`);
+  };
+  
+  const downloadPdf = async (reportData: ReportData | null) => {
+    if (!reportData) return;
+    
+    try {
+      const pdfBlob = await reportsService.exportToPDF(reportData);
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${reportData.title.replace(/\s+/g, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success(`${reportData.title} exported as PDF.`);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast.error('Error exporting PDF. Please try again.');
+    }
+  };
+  
+  const downloadCsv = (reportData: ReportData | null) => {
+    if (!reportData) return;
+    
+    try {
+      const csvContent = reportsService.exportToCSV(reportData);
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${reportData.title.replace(/\s+/g, '_')}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success(`${reportData.title} exported as CSV.`);
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      toast.error('Error exporting CSV. Please try again.');
+    }
   };
 
   const isLoading = isLoadingFinancial || isLoadingTransactions || isLoadingCustomers || isLoadingSuppliers;
@@ -149,13 +242,26 @@ const Reports = () => {
                       <FileText className="h-5 w-5 mr-3 text-primary" />
                       <span>{report}</span>
                     </div>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      onClick={() => handleGenerateReport(report)}
-                    >
-                      Generate
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => generateReport(report)}
+                        disabled={isGeneratingReport}
+                      >
+                        {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Generate
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleExport(report)}
+                        disabled={isGeneratingReport}
+                      >
+                        <FilePdf className="h-4 w-4 mr-2" />
+                        Export
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -316,6 +422,15 @@ const Reports = () => {
           </GlassCard>
         </TabsContent>
       </Tabs>
+      
+      <ReportViewer 
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        reportData={currentReport}
+        isLoading={isGeneratingReport}
+        onDownloadPDF={() => downloadPdf(currentReport)}
+        onDownloadCSV={() => downloadCsv(currentReport)}
+      />
     </Layout>
   );
 };
