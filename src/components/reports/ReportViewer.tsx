@@ -8,7 +8,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { FilePdf, FileText, Loader2 } from "lucide-react";
+import { FileText, Loader2, File } from "lucide-react";
 import { ReportData } from '@/services/reports';
 
 interface ReportViewerProps {
@@ -101,7 +101,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({
             className="gap-2"
             disabled={isLoading || !reportData}
           >
-            <FilePdf className="h-4 w-4" />
+            <File className="h-4 w-4" />
             Download PDF
           </Button>
           <Button onClick={onClose}>Close</Button>

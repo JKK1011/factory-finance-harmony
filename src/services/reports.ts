@@ -1,4 +1,3 @@
-
 import { financeApi, transactionsApi, contactsApi } from '@/services/api';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
@@ -16,7 +15,7 @@ export interface ReportData {
 export const reportsService = {
   // Generate Profit & Loss Statement
   generateProfitLossStatement: async (period: string = '30'): Promise<ReportData> => {
-    const { data: transactions = [] } = await transactionsApi.getTransactions();
+    const transactions = await transactionsApi.getTransactions();
     
     // Filter transactions based on period
     const endDate = new Date();
@@ -70,9 +69,9 @@ export const reportsService = {
   
   // Generate Balance Sheet
   generateBalanceSheet: async (): Promise<ReportData> => {
-    const { data: financial } = await financeApi.getFinancialOverview();
-    const { data: customers = [] } = await contactsApi.getContactsByType('customer');
-    const { data: suppliers = [] } = await contactsApi.getContactsByType('supplier');
+    const financial = await financeApi.getFinancialOverview();
+    const customers = await contactsApi.getContactsByType('customer');
+    const suppliers = await contactsApi.getContactsByType('supplier');
     
     const totalReceivables = customers.reduce((sum: number, customer: any) => 
       sum + Math.max(0, customer.balance), 0);
@@ -107,7 +106,7 @@ export const reportsService = {
   
   // Generate Cash Flow Statement
   generateCashFlowStatement: async (period: string = '30'): Promise<ReportData> => {
-    const { data: transactions = [] } = await transactionsApi.getTransactions();
+    const transactions = await transactionsApi.getTransactions();
     
     // Filter transactions based on period
     const endDate = new Date();
@@ -177,8 +176,8 @@ export const reportsService = {
   
   // Generate Customer Ledger
   generateCustomerLedger: async (): Promise<ReportData> => {
-    const { data: customers = [] } = await contactsApi.getContactsByType('customer');
-    const { data: transactions = [] } = await transactionsApi.getTransactions();
+    const customers = await contactsApi.getContactsByType('customer');
+    const transactions = await transactionsApi.getTransactions();
     
     // Build ledger data
     const customerTransactions = customers.map((customer: any) => {
@@ -218,8 +217,8 @@ export const reportsService = {
   
   // Generate Supplier Ledger
   generateSupplierLedger: async (): Promise<ReportData> => {
-    const { data: suppliers = [] } = await contactsApi.getContactsByType('supplier');
-    const { data: transactions = [] } = await transactionsApi.getTransactions();
+    const suppliers = await contactsApi.getContactsByType('supplier');
+    const transactions = await transactionsApi.getTransactions();
     
     // Build ledger data
     const supplierTransactions = suppliers.map((supplier: any) => {
@@ -259,7 +258,7 @@ export const reportsService = {
   
   // Generate Tax Summary
   generateTaxSummary: async (period: string = '365'): Promise<ReportData> => {
-    const { data: transactions = [] } = await transactionsApi.getTransactions();
+    const transactions = await transactionsApi.getTransactions();
     
     // Filter transactions based on period
     const endDate = new Date();

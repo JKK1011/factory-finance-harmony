@@ -3,7 +3,7 @@ import { Layout } from "@/components/layout/Layout";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Download, Calendar, Loader2, FilePdf } from "lucide-react";
+import { FileText, Download, Calendar, Loader2, File } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { financeApi, transactionsApi, contactsApi } from "@/services/api";
 import { format } from "date-fns";
